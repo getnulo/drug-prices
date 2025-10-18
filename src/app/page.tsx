@@ -66,7 +66,7 @@ export default function HomePage() {
           setErrorMsg("No offers found. Try ZIPs: 78701, 10001, 94103.");
         }
       }
-    } catch (e) {
+    } catch {
       setErrorMsg("Network error");
     } finally {
       setLoading(false);
@@ -87,7 +87,7 @@ export default function HomePage() {
       />
       {suggestions.length > 0 && (
         <div className="border rounded bg-white mb-4">
-          {suggestions.map((s) => (
+          {suggestions.map((s: Suggestion) => (
             <div
               key={s.rxCui}
               onClick={() => {
@@ -145,7 +145,7 @@ export default function HomePage() {
       {results.length > 0 && (
         <div className="mt-6">
           <h2 className="text-xl font-semibold mb-2">Results</h2>
-          {results.map((r, i) => (
+          {results.map((r: Offer, i: number) => (
             <div key={i} className="border p-3 rounded mb-2">
               <div className="font-bold">{r.source.toUpperCase()}</div>
               <div>${r.totalPrice.toFixed(2)}</div>
