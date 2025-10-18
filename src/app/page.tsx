@@ -2,6 +2,13 @@
 
 import { useState } from "react";
 
+type Suggestion = {
+  rxCui: string;
+  name: string;
+  forms: string[];
+  strengths: string[];
+};
+
 type Offer = {
   source: string;
   totalPrice: number;
@@ -16,10 +23,10 @@ type Offer = {
 
 export default function HomePage() {
   const [query, setQuery] = useState("");
-  const [suggestions, setSuggestions] = useState<any[]>([]);
+  const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [rxCui, setRxCui] = useState<string | null>(null);
   const [strength, setStrength] = useState("");
-  const [quantity, setQuantity] = useState<number>(30);   // ← number
+  const [quantity, setQuantity] = useState<number>(30);
   const [zip, setZip] = useState("");
   const [results, setResults] = useState<Offer[]>([]);
   const [loading, setLoading] = useState(false);
@@ -30,7 +37,7 @@ export default function HomePage() {
     setErrorMsg(null);
     if (q.length < 2) return setSuggestions([]);
     const res = await fetch(`/api/autocomplete?q=${encodeURIComponent(q)}`);
-    const data = await res.json();
+    const data: Suggestion[] = await res.json();
     setSuggestions(data);
   }
 
@@ -47,15 +54,10 @@ export default function HomePage() {
       const res = await fetch("/api/search", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          rxCui,
-          strength,
-          quantity,           // ← already a number
-          zip
-        }),
+        body: JSON.stringify({ rxCui, strength, quantity, zip }),
       });
+      const data: { offers?: Offer[]; error?: string } = await res.json();
 
-      const data = await res.json();
       if (!res.ok) {
         setErrorMsg(data?.error || "Search failed");
       } else {
@@ -64,8 +66,8 @@ export default function HomePage() {
           setErrorMsg("No offers found. Try ZIPs: 78701, 10001, 94103.");
         }
       }
-    } catch (e: any) {
-      setErrorMsg(e?.message || "Network error");
+    } catch (e) {
+      setErrorMsg("Network error");
     } finally {
       setLoading(false);
     }
@@ -116,7 +118,7 @@ export default function HomePage() {
           placeholder="Qty"
           value={quantity}
           min={1}
-          onChange={(e) => setQuantity(parseInt(e.target.value || "0"))}  // ← number
+          onChange={(e) => setQuantity(parseInt(e.target.value || "0"))}
           className="border p-2 w-24 rounded"
         />
       </div>
@@ -138,10 +140,8 @@ export default function HomePage() {
         {loading ? "Searching..." : "Search"}
       </button>
 
-      {/* Errors / Empty */}
       {errorMsg && <div className="mt-4 text-sm text-red-600">{errorMsg}</div>}
 
-      {/* Results */}
       {results.length > 0 && (
         <div className="mt-6">
           <h2 className="text-xl font-semibold mb-2">Results</h2>
