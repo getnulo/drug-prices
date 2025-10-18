@@ -1,0 +1,56 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model Drug {
+  id        String   @id @default(cuid())
+  rxCui     String   @unique         // RxNorm ID
+  name      String
+  forms     String[]                 // ["tablet","capsule"]
+  strengths String[]                 // ["250 mg","500 mg"]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Zip {
+  zip   String @id
+  city  String
+  state String
+  lat   Float
+  lng   Float
+}
+
+model SearchQuery {
+  id        String   @id @default(cuid())
+  rxCui     String
+  strength  String
+  quantity  Int
+  zip       String
+  createdAt DateTime @default(now())
+}
+
+model Offer {
+  id            String   @id @default(cuid())
+  source        String   // 'goodrx' | 'costplus' | 'amazon' | 'mock'
+  drugRxCui     String
+  drugName      String
+  form          String
+  strength      String
+  quantity      Int
+  priceSubtotal Float
+  priceFees     Float
+  shipping      Float?
+  totalPrice    Float
+  pickupOrMail  String   // 'pickup' | 'mail'
+  pharmacyName  String?
+  pharmacyAddr  String?
+  pharmacyLat   Float?
+  pharmacyLng   Float?
+  terms         String?
+  fetchedAt     DateTime @default(now())
+}
