@@ -3,7 +3,6 @@ export const dynamic = "force-dynamic";
 
 import { prisma } from "@/lib/db";
 
-// Narrow unknown → string safely
 function toErrorMessage(err: unknown): string {
   if (err instanceof Error) return err.message;
   try {
@@ -16,13 +15,11 @@ function toErrorMessage(err: unknown): string {
 export async function GET() {
   try {
     const now = await prisma.$queryRaw<{ now: Date }[]>`SELECT NOW() as now`;
-
     const table = await prisma.$queryRaw<{ exists: boolean }[]>`
       SELECT EXISTS (
         SELECT FROM information_schema.tables WHERE table_name = 'Drug'
       ) as exists
     `;
-
     return new Response(
       JSON.stringify({
         ok: true,
