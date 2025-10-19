@@ -1,267 +1,287 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useState, useEffect } from "react";
 
-type Suggestion = {
-  rxCui: string;
+interface Drug {
   name: string;
-  forms: string[];
-  strengths: string[];
-};
+  generic: string;
+  typicalDosages?: string[];
+  rxCui?: string;
+}
 
-type Offer = {
-  source: string;
-  totalPrice: number;
-  pickupOrMail?: string;
-  pharmacyName?: string | null;
-  distanceMiles?: number | null;
-  priceSubtotal?: number;
-  priceFees?: number;
-  shipping?: number | null;
-  terms?: string | null;
-};
+interface Offer {
+  pharmacyName: string | null;
+  price: number;
+  rawPriceText?: string | null;
+  source?: string;
+}
 
 export default function HomePage() {
-  // ===== form state =====
-  const [query, setQuery] = useState("");
-  const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
-  const [rxCui, setRxCui] = useState<string | null>(null);
+  const [drugInput, setDrugInput] = useState("");
+  const [rxCui, setRxCui] = useState("");
+  const [autocomplete, setAutocomplete] = useState<Drug[]>([]);
+  const [showDropdown, setShowDropdown] = useState(false);
+  const [hasTypedAfterSelect, setHasTypedAfterSelect] = useState(false);
+
+  const [typicalDosages, setTypicalDosages] = useState<string[]>([]);
   const [strength, setStrength] = useState("");
-  const [quantity, setQuantity] = useState<number>(30);
+  const [quantity, setQuantity] = useState(30);
   const [zip, setZip] = useState("");
-  const [results, setResults] = useState<Offer[]>([]);
+  const [offers, setOffers] = useState<Offer[]>([]);
   const [loading, setLoading] = useState(false);
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [error, setError] = useState("");
+  const [sortMethod, setSortMethod] = useState<"price" | "distance">("price");
 
-  // ===== autocomplete helpers =====
-  const [open, setOpen] = useState(false);
-  const [highlightIndex, setHighlightIndex] = useState<number>(-1);
-  const lastFetchId = useRef(0);
-  const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const inputRef = useRef<HTMLInputElement | null>(null);
-
-  // ---- Debounced autocomplete fetch (runs 200ms after you stop typing) ----
   useEffect(() => {
-    // clear any previous timer
-    if (debounceTimer.current) clearTimeout(debounceTimer.current);
-
-    // guard: don’t fetch for very short strings
-    if (query.trim().length < 2) {
-      setSuggestions([]);
-      setOpen(false);
-      setHighlightIndex(-1);
+    if (drugInput.length < 2) {
+      setAutocomplete([]);
+      setShowDropdown(false);
+      setHasTypedAfterSelect(false);
+      setTypicalDosages([]);
       return;
     }
-
-    debounceTimer.current = setTimeout(async () => {
-      try {
-        setErrorMsg(null);
-        const fetchId = ++lastFetchId.current;
-
-        const res = await fetch(`/api/autocomplete?q=${encodeURIComponent(query)}`, {
-          cache: "no-store",
-        });
-        if (!res.ok) return; // silent fail is fine for autocomplete UX
-
-        const data: Suggestion[] = await res.json();
-
-        // Only set results if this is the latest request (prevents “race” bugs)
-        if (fetchId === lastFetchId.current) {
-          setSuggestions(data);
-          setOpen(data.length > 0);
-          setHighlightIndex(data.length > 0 ? 0 : -1);
-        }
-      } catch {
-        // ignore network flakiness for autocomplete; you still can type/search
+    const timeout = setTimeout(async () => {
+      const res = await fetch(`/api/autocomplete?q=${encodeURIComponent(drugInput)}`);
+      if (res.ok) {
+        const data = await res.json();
+        setAutocomplete(data);
+        if (hasTypedAfterSelect) setShowDropdown(true);
+      } else {
+        setAutocomplete([]);
+        setShowDropdown(false);
+        setTypicalDosages([]);
       }
     }, 200);
+    return () => clearTimeout(timeout);
+  }, [drugInput, hasTypedAfterSelect]);
 
-    return () => {
-      if (debounceTimer.current) clearTimeout(debounceTimer.current);
-    };
-  }, [query]);
+  const onInputChange = (val: string) => {
+    setDrugInput(val);
+    setRxCui("");
+    setHasTypedAfterSelect(true);
+    setTypicalDosages([]);
+    setStrength("");
+  };
 
-  // ---- Choose a suggestion (click or keyboard) ----
-  function chooseSuggestion(s: Suggestion) {
-    setRxCui(s.rxCui);
-    setQuery(s.name);
-    setStrength(s.strengths?.[0] || "");
-    setSuggestions([]);
-    setOpen(false);
-    setHighlightIndex(-1);
-  }
+  const selectDrug = (drug: Drug) => {
+    setDrugInput(drug.name);
+    setRxCui(drug.rxCui || "");
+    setTypicalDosages(drug.typicalDosages || []);
+    if (drug.typicalDosages && drug.typicalDosages.length > 0) {
+      setStrength(drug.typicalDosages[0]);
+    } else {
+      setStrength("");
+    }
+    setAutocomplete([]);
+    setShowDropdown(false);
+    setHasTypedAfterSelect(false);
+  };
 
-  // ---- Keyboard navigation on the input ----
-  function onInputKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
-    if (!open || suggestions.length === 0) return;
+  const isFormValid =
+    drugInput.trim() !== "" && strength.trim() !== "" && zip.trim().match(/^\d{5}$/);
 
-    if (e.key === "ArrowDown") {
-      e.preventDefault();
-      setHighlightIndex((i) => (i + 1) % suggestions.length);
-    } else if (e.key === "ArrowUp") {
-      e.preventDefault();
-      setHighlightIndex((i) => (i - 1 + suggestions.length) % suggestions.length);
-    } else if (e.key === "Enter") {
-      if (highlightIndex >= 0 && highlightIndex < suggestions.length) {
-        e.preventDefault();
-        chooseSuggestion(suggestions[highlightIndex]);
+  async function fetchGoodRxOffers(drugName: string, dosage: string, zip: string) {
+    try {
+      const res = await fetch('/api/goodrx', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ drugName, dosage, zip }),
+      });
+      if (!res.ok) {
+        throw new Error(`API error: ${res.status}`);
       }
-    } else if (e.key === "Escape") {
-      setOpen(false);
-      setHighlightIndex(-1);
+      const data = await res.json();
+      return data.offers || [];
+    } catch (e) {
+      console.error("Failed to fetch GoodRx offers", e);
+      return [];
     }
   }
 
-  // ---- Slight delay on blur so clicks on the menu still register ----
-  function onInputBlur() {
-    setTimeout(() => setOpen(false), 120);
-  }
+  const onSearch = () => {
+    if (!isFormValid) {
+      setError("Please select a drug, enter strength, and a valid 5-digit ZIP");
+      setOffers([]);
+      return;
+    }
+    fetchOffers();
+  };
 
-  // ---- Your existing search handler (unchanged except minor cleanup) ----
-  async function handleSearch() {
-    setErrorMsg(null);
-
-    if (!rxCui) return alert("Pick a drug from the list");
-    if (!strength) return alert("Enter or select a strength");
-    if (zip.length !== 5) return alert("Enter a 5-digit ZIP");
-
+  async function fetchOffers() {
     setLoading(true);
-    setResults([]);
+    setError("");
+    setOffers([]);
 
     try {
-      const res = await fetch("/api/search", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ rxCui, strength, quantity, zip }),
-      });
-
-      const data: { offers?: Offer[]; error?: string } = await res.json();
-
-      if (!res.ok) {
-        setErrorMsg(data?.error || "Search failed");
-      } else {
-        const offers = data.offers || [];
-        setResults(offers);
-        if (offers.length === 0) {
-          setErrorMsg("No offers found. Try ZIPs: 78701, 10001, 94103.");
-        }
-      }
-    } catch {
-      setErrorMsg("Network error");
+      const goodRxOffers = await fetchGoodRxOffers(drugInput, strength, zip);
+      setOffers(goodRxOffers);
+    } catch (error) {
+      setError("Failed to fetch offers");
     } finally {
       setLoading(false);
     }
   }
 
+  useEffect(() => {
+    if (!offers.length) return;
+    const sorted = [...offers].sort((a, b) => {
+      if (sortMethod === "price") {
+        return a.price - b.price;
+      }
+      return 0;
+    });
+    setOffers(sorted);
+  }, [sortMethod]);
+
+  const clearForm = () => {
+    setDrugInput("");
+    setRxCui("");
+    setTypicalDosages([]);
+    setStrength("");
+    setQuantity(30);
+    setZip("");
+    setOffers([]);
+    setError("");
+    setShowDropdown(false);
+    setHasTypedAfterSelect(false);
+  };
+
   return (
-    <main className="p-6 max-w-2xl mx-auto">
-      <h1 className="text-3xl font-bold mb-6">Drug Price Finder</h1>
-
-      {/* Autocomplete input */}
-      <div className="relative mb-2">
+    <main className="max-w-xl mx-auto p-4 relative">
+      <h1 className="text-2xl font-bold mb-4">Medication Price Search</h1>
+      <div className="relative mb-3">
         <input
-          ref={inputRef}
           type="text"
-          placeholder="Enter drug name…"
-          value={query}
-          onChange={(e) => {
-            setQuery(e.target.value);
-            setOpen(true); // open as soon as they type
+          placeholder="Drug Name"
+          value={drugInput}
+          onChange={(e) => onInputChange(e.target.value)}
+          onFocus={() => {
+            if (autocomplete.length > 0 && hasTypedAfterSelect) setShowDropdown(true);
           }}
-          onKeyDown={onInputKeyDown}
-          onBlur={onInputBlur}
-          className="border p-2 w-full rounded"
-          aria-autocomplete="list"
-          aria-expanded={open}
-          aria-controls="drug-suggestions"
-          aria-activedescendant={
-            highlightIndex >= 0 ? `suggestion-${highlightIndex}` : undefined
-          }
+          className="border border-gray-300 rounded px-3 py-2 w-full"
+          autoComplete="off"
+          disabled={loading}
         />
-
-        {open && suggestions.length > 0 && (
-          <ul
-            id="drug-suggestions"
-            role="listbox"
-            className="absolute z-10 w-full bg-white border rounded mt-1 shadow max-h-64 overflow-auto"
-          >
-            {suggestions.map((s, idx) => {
-              const highlighted = idx === highlightIndex;
-              return (
-                <li
-                  id={`suggestion-${idx}`}
-                  role="option"
-                  aria-selected={highlighted}
-                  key={s.rxCui}
-                  onMouseDown={(e) => e.preventDefault()} // keep focus so click works cleanly
-                  onClick={() => chooseSuggestion(s)}
-                  className={`p-2 cursor-pointer ${
-                    highlighted ? "bg-gray-100" : "hover:bg-gray-50"
-                  }`}
-                >
-                  {s.name}
-                </li>
-              );
-            })}
+        {showDropdown && autocomplete.length > 0 && (
+          <ul className="absolute z-10 bg-white border border-gray-300 w-full max-h-48 overflow-y-auto rounded shadow-md mt-1 text-black">
+            {autocomplete.map((drug) => (
+              <li
+                key={(drug.rxCui || "") + "-" + drug.name}
+                className="cursor-pointer px-3 py-2 hover:bg-blue-100 text-black"
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  selectDrug(drug);
+                }}
+              >
+                {drug.name} <span className="text-xs text-gray-400">({drug.generic})</span>
+              </li>
+            ))}
           </ul>
         )}
       </div>
 
-      {/* Strength & Quantity */}
-      <div className="flex gap-2 mb-2">
-        <input
-          type="text"
-          placeholder="Strength (e.g. 500 mg)"
-          value={strength}
-          onChange={(e) => setStrength(e.target.value)}
-          className="border p-2 flex-1 rounded"
-        />
-        <input
-          type="number"
-          placeholder="Qty"
-          value={quantity}
-          min={1}
-          onChange={(e) => setQuantity(parseInt(e.target.value || "0"))}
-          className="border p-2 w-24 rounded"
-        />
+      <div className="mb-3 w-full">
+        {typicalDosages && typicalDosages.length > 0 ? (
+          <select
+            value={strength}
+            onChange={(e) => setStrength(e.target.value)}
+            disabled={loading}
+            className={`border rounded px-3 py-2 w-full ${
+              !strength && error ? "border-red-500" : "border-gray-300"
+            }`}
+          >
+            <option value="" disabled>
+              Select Strength
+            </option>
+            {typicalDosages.map((dose) => (
+              <option key={dose} value={dose}>
+                {dose}
+              </option>
+            ))}
+          </select>
+        ) : (
+          <input
+            type="text"
+            placeholder="Strength (e.g., 250 mg)"
+            value={strength}
+            onChange={(e) => setStrength(e.target.value)}
+            disabled={loading}
+            className={`border rounded px-3 py-2 w-full ${
+              !strength && error ? "border-red-500" : "border-gray-300"
+            }`}
+          />
+        )}
       </div>
 
-      {/* Zip Code */}
+      <input
+        type="number"
+        min={1}
+        placeholder="Quantity"
+        value={quantity}
+        onChange={(e) => setQuantity(Number(e.target.value))}
+        disabled={loading}
+        className="border border-gray-300 rounded px-3 py-2 mb-3 w-full"
+      />
       <input
         type="text"
         placeholder="ZIP Code"
         value={zip}
-        onChange={(e) => setZip(e.target.value.replace(/\D/g, "").slice(0, 5))}
-        className="border p-2 w-full rounded mb-4"
+        onChange={(e) => setZip(e.target.value)}
+        disabled={loading}
+        className={`border rounded px-3 py-2 mb-3 w-full ${
+          !zip.match(/^\d{5}$/) && error ? "border-red-500" : "border-gray-300"
+        }`}
       />
 
-      <button
-        onClick={handleSearch}
-        className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 disabled:opacity-60"
-        disabled={loading}
-      >
-        {loading ? "Searching..." : "Search"}
-      </button>
+      <div className="flex gap-3 mb-4">
+        <button
+          onClick={onSearch}
+          disabled={!isFormValid || loading}
+          className="bg-blue-600 text-white px-4 py-2 rounded flex-grow disabled:opacity-50"
+        >
+          {loading ? "Searching..." : "Search"}
+        </button>
+        <button
+          onClick={clearForm}
+          className="border border-gray-500 px-4 py-2 rounded flex-grow"
+          disabled={loading}
+        >
+          Clear
+        </button>
+      </div>
 
-      {errorMsg && <div className="mt-4 text-sm text-red-600">{errorMsg}</div>}
+      <div className="mb-4 flex gap-4">
+        <label className="flex items-center gap-2">
+          <input
+            type="radio"
+            name="sort"
+            checked={sortMethod === "price"}
+            onChange={() => setSortMethod("price")}
+          />
+          Sort by Price
+        </label>
+      </div>
 
-      {results.length > 0 && (
-        <div className="mt-6">
-          <h2 className="text-xl font-semibold mb-2">Results</h2>
-          {results.map((r, i) => (
-            <div key={i} className="border p-3 rounded mb-2">
-              <div className="font-bold">{r.source.toUpperCase()}</div>
-              <div>${r.totalPrice.toFixed(2)}</div>
-              {r.pharmacyName && (
-                <div className="text-sm text-gray-600">
-                  {r.pharmacyName}{" "}
-                  {r.distanceMiles != null ? `(${r.distanceMiles.toFixed(1)} mi)` : ""}
-                </div>
-              )}
+      {error && <p className="mb-4 text-red-600">{error}</p>}
+
+      <ul className="space-y-4">
+        {offers.length === 0 && !loading && !error && (
+          <li className="text-gray-500">No offers found</li>
+        )}
+
+        {offers.map((offer, idx) => (
+          <li
+            key={idx}
+            className="p-4 border border-gray-200 rounded hover:shadow-md transition"
+          >
+            <div className="flex justify-between items-center">
+              <span className="font-semibold capitalize">{offer.pharmacyName || offer.source || "Unknown"}</span>
+              <span className="font-mono">${offer.price.toFixed(2)}</span>
             </div>
-          ))}
-        </div>
-      )}
+            <div className="text-xs text-gray-400 italic">{offer.rawPriceText || ""}</div>
+          </li>
+        ))}
+      </ul>
     </main>
   );
 }

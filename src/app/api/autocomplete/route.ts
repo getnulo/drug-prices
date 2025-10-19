@@ -1,43 +1,113 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/db";
 
-// Strongly prefer Node runtime for Prisma
-export const runtime = "nodejs";
-export const dynamic = "force-dynamic";
+const topDrugs = [
+  { "rxCui": "10001", "name": "Abilify", "generic": "Aripiprazole", "typicalDosages": ["10 mg tablet"] },
+  { "rxCui": "10002", "name": "Advair Diskus", "generic": "Fluticasone propionate/Salmeterol", "typicalDosages": ["60 count diskus"] },
+  { "rxCui": "10003", "name": "Amaryl", "generic": "Glimepiride", "typicalDosages": ["2 mg tablet"] },
+  { "rxCui": "10004", "name": "Amoxil", "generic": "Amoxicillin", "typicalDosages": ["500 mg capsule"] },
+  { "rxCui": "10005", "name": "Aricept", "generic": "Donepezil", "typicalDosages": ["10 mg tablet"] },
+  { "rxCui": "10006", "name": "Augmentin", "generic": "Amoxicillin/Clavulanate", "typicalDosages": ["875-125 mg tablet"] },
+  { "rxCui": "10007", "name": "Avapro", "generic": "Irbesartan", "typicalDosages": ["150 mg tablet"] },
+  { "rxCui": "10008", "name": "Bactrim DS", "generic": "Sulfamethoxazole/Trimethoprim", "typicalDosages": ["double strength tablet"] },
+  { "rxCui": "10009", "name": "Bactroban", "generic": "Mupirocin", "typicalDosages": ["22 gram ointment"] },
+  { "rxCui": "10010", "name": "Benicar", "generic": "Olmesartan", "typicalDosages": ["20 mg tablet"] },
+  { "rxCui": "10011", "name": "Bystolic", "generic": "Nebivolol", "typicalDosages": ["5 mg tablet"] },
+  { "rxCui": "10012", "name": "Celebrex", "generic": "Celecoxib", "typicalDosages": ["100 mg capsule"] },
+  { "rxCui": "10013", "name": "Celexa", "generic": "Citalopram", "typicalDosages": ["20 mg tablet"] },
+  { "rxCui": "10014", "name": "Cialis", "generic": "Tadalafil", "typicalDosages": ["10 mg tablet"] },
+  { "rxCui": "10015", "name": "Cipro", "generic": "Ciprofloxacin", "typicalDosages": ["500 mg tablet"] },
+  { "rxCui": "10016", "name": "Citalopram", "generic": "Citalopram", "typicalDosages": ["20 mg tablet"] },
+  { "rxCui": "10017", "name": "Claritin", "generic": "Loratadine", "typicalDosages": ["10 mg tablet"] },
+  { "rxCui": "10018", "name": "Clonazepam", "generic": "Clonazepam", "typicalDosages": ["0.5 mg tablet"] },
+  { "rxCui": "10019", "name": "Crestor", "generic": "Rosuvastatin", "typicalDosages": ["10 mg tablet"] },
+  { "rxCui": "10020", "name": "Cymbalta", "generic": "Duloxetine", "typicalDosages": ["20 mg capsule"] },
+  { "rxCui": "10021", "name": "Diazepam", "generic": "Diazepam", "typicalDosages": ["5 mg tablet"] },
+  { "rxCui": "10022", "name": "Diclofenac", "generic": "Diclofenac", "typicalDosages": ["50 mg tablet"] },
+  { "rxCui": "10023", "name": "Diflucan", "generic": "Fluconazole", "typicalDosages": ["150 mg tablet"] },
+  { "rxCui": "10024", "name": "Diltiazem", "generic": "Diltiazem", "typicalDosages": ["30 mg tablet"] },
+  { "rxCui": "10025", "name": "Domperidone", "generic": "Domperidone", "typicalDosages": ["10 mg tablet"] },
+  { "rxCui": "10026", "name": "Donepezil", "generic": "Donepezil", "typicalDosages": ["10 mg tablet"] },
+  { "rxCui": "10027", "name": "Doxycycline", "generic": "Doxycycline", "typicalDosages": ["100 mg tablet"] },
+  { "rxCui": "10028", "name": "Effexor", "generic": "Venlafaxine", "typicalDosages": ["37.5 mg tablet"] },
+  { "rxCui": "10029", "name": "Elavil", "generic": "Amitriptyline", "typicalDosages": ["25 mg tablet"] },
+  { "rxCui": "10030", "name": "Enalapril", "generic": "Enalapril", "typicalDosages": ["5 mg tablet"] },
+  { "rxCui": "10031", "name": "Enbrel", "generic": "Etanercept", "typicalDosages": ["50 mg injection"] },
+  { "rxCui": "10032", "name": "Eptifibatide", "generic": "Eptifibatide", "typicalDosages": ["2 mg/ml injection"] },
+  { "rxCui": "10033", "name": "Estradiol", "generic": "Estradiol", "typicalDosages": ["0.025 mg patch"] },
+  { "rxCui": "10034", "name": "Eszopiclone", "generic": "Eszopiclone", "typicalDosages": ["1 mg tablet"] },
+  { "rxCui": "10035", "name": "Evista", "generic": "Raloxifene", "typicalDosages": ["60 mg tablet"] },
+  { "rxCui": "10036", "name": "Exenatide", "generic": "Exenatide", "typicalDosages": ["5 mcg injection"] },
+  { "rxCui": "10037", "name": "Fentanyl", "generic": "Fentanyl", "typicalDosages": ["25 mcg patch"] },
+  { "rxCui": "10038", "name": "Finasteride", "generic": "Finasteride", "typicalDosages": ["5 mg tablet"] },
+  { "rxCui": "10039", "name": "Fluoxetine", "generic": "Fluoxetine", "typicalDosages": ["20 mg capsule"] },
+  { "rxCui": "10040", "name": "Fluticasone", "generic": "Fluticasone", "typicalDosages": ["50 mcg inhaler"] },
+  { "rxCui": "10041", "name": "Furosemide", "generic": "Furosemide", "typicalDosages": ["20 mg tablet"] },
+  { "rxCui": "10042", "name": "Gabapentin", "generic": "Gabapentin", "typicalDosages": ["300 mg capsule"] },
+  { "rxCui": "10043", "name": "Glyburide", "generic": "Glyburide", "typicalDosages": ["5 mg tablet"] },
+  { "rxCui": "10044", "name": "Humira", "generic": "Adalimumab", "typicalDosages": ["40 mg injection"] },
+  { "rxCui": "10045", "name": "Ibuprofen", "generic": "Ibuprofen", "typicalDosages": ["400 mg tablet"] },
+  { "rxCui": "10046", "name": "Imitrex", "generic": "Sumatriptan", "typicalDosages": ["50 mg tablet"] },
+  { "rxCui": "10047", "name": "Inderal", "generic": "Propranolol", "typicalDosages": ["10 mg tablet"] },
+  { "rxCui": "10048", "name": "Insulin glargine", "generic": "Insulin glargine", "typicalDosages": ["100 units/ml injection"] },
+  { "rxCui": "10049", "name": "Januvia", "generic": "Sitagliptin", "typicalDosages": ["100 mg tablet"] },
+  { "rxCui": "10050", "name": "Klonopin", "generic": "Clonazepam", "typicalDosages": ["0.5 mg tablet"] },
+  { "rxCui": "10051", "name": "Lantus", "generic": "Insulin glargine", "typicalDosages": ["100 units/ml injection"] },
+  { "rxCui": "10052", "name": "Lasix", "generic": "Furosemide", "typicalDosages": ["20 mg tablet"] },
+  { "rxCui": "10053", "name": "Levaquin", "generic": "Levofloxacin", "typicalDosages": ["500 mg tablet"] },
+  { "rxCui": "10054", "name": "Levemir", "generic": "Insulin detemir", "typicalDosages": ["100 units/ml injection"] },
+  { "rxCui": "10055", "name": "Lexapro", "generic": "Escitalopram", "typicalDosages": ["10 mg tablet"] },
+  { "rxCui": "10056", "name": "Lipitor", "generic": "Atorvastatin", "typicalDosages": ["10 mg tablet"] },
+  { "rxCui": "10057", "name": "Lisinopril", "generic": "Lisinopril", "typicalDosages": ["10 mg tablet"] },
+  { "rxCui": "10058", "name": "Loratadine", "generic": "Loratadine", "typicalDosages": ["10 mg tablet"] },
+  { "rxCui": "10059", "name": "Losartan", "generic": "Losartan", "typicalDosages": ["50 mg tablet"] },
+  { "rxCui": "10060", "name": "Lyrica", "generic": "Pregabalin", "typicalDosages": ["75 mg capsule"] },
+  { "rxCui": "10061", "name": "Meloxicam", "generic": "Meloxicam", "typicalDosages": ["7.5 mg tablet"] },
+  { "rxCui": "10062", "name": "Metformin", "generic": "Metformin", "typicalDosages": ["500 mg tablet"] },
+  { "rxCui": "10063", "name": "Methadone", "generic": "Methadone", "typicalDosages": ["10 mg tablet"] },
+  { "rxCui": "10064", "name": "Methotrexate", "generic": "Methotrexate", "typicalDosages": ["2.5 mg tablet"] },
+  { "rxCui": "10065", "name": "Metoprolol", "generic": "Metoprolol", "typicalDosages": ["50 mg tablet"] },
+  { "rxCui": "10066", "name": "Naproxen", "generic": "Naproxen", "typicalDosages": ["220 mg tablet"] },
+  { "rxCui": "10067", "name": "Nexium", "generic": "Esomeprazole", "typicalDosages": ["20 mg capsule"] },
+  { "rxCui": "10068", "name": "Norvasc", "generic": "Amlodipine", "typicalDosages": ["5 mg tablet"] },
+  { "rxCui": "10069", "name": "Oxycodone", "generic": "Oxycodone", "typicalDosages": ["5 mg tablet"] },
+  { "rxCui": "10070", "name": "Pantoprazole", "generic": "Pantoprazole", "typicalDosages": ["40 mg tablet"] },
+  { "rxCui": "10071", "name": "Paroxetine", "generic": "Paroxetine", "typicalDosages": ["20 mg tablet"] },
+  { "rxCui": "10072", "name": "Phentermine", "generic": "Phentermine", "typicalDosages": ["37.5 mg tablet"] },
+  { "rxCui": "10073", "name": "Plavix", "generic": "Clopidogrel", "typicalDosages": ["75 mg tablet"] },
+  { "rxCui": "10074", "name": "Prednisone", "generic": "Prednisone", "typicalDosages": ["10 mg tablet"] },
+  { "rxCui": "10075", "name": "Proair HFA", "generic": "Albuterol", "typicalDosages": ["90 mcg inhaler"] },
+  { "rxCui": "10076", "name": "Propranolol", "generic": "Propranolol", "typicalDosages": ["10 mg tablet"] },
+  { "rxCui": "10077", "name": "Prilosec", "generic": "Omeprazole", "typicalDosages": ["20 mg capsule"] },
+  { "rxCui": "10078", "name": "Pulmicort", "generic": "Budesonide", "typicalDosages": ["90 mcg inhaler"] },
+  { "rxCui": "10079", "name": "Quetiapine", "generic": "Quetiapine", "typicalDosages": ["100 mg tablet"] },
+  { "rxCui": "10080", "name": "Ranitidine", "generic": "Ranitidine", "typicalDosages": ["150 mg tablet"] },
+  { "rxCui": "10081", "name": "Restasis", "generic": "Cyclosporine", "typicalDosages": ["0.05% ophthalmic solution"] },
+  { "rxCui": "10082", "name": "Sertraline", "generic": "Sertraline", "typicalDosages": ["50 mg tablet"] },
+  { "rxCui": "10083", "name": "Singulair", "generic": "Montelukast", "typicalDosages": ["10 mg tablet"] },
+  { "rxCui": "10084", "name": "Spironolactone", "generic": "Spironolactone", "typicalDosages": ["25 mg tablet"] },
+  { "rxCui": "10085", "name": "Synthroid", "generic": "Levothyroxine", "typicalDosages": ["50 mcg tablet"] },
+  { "rxCui": "10086", "name": "Tamsulosin", "generic": "Tamsulosin", "typicalDosages": ["0.4 mg capsule"] },
+  { "rxCui": "10087", "name": "Tramadol", "generic": "Tramadol", "typicalDosages": ["50 mg tablet"] },
+  { "rxCui": "10088", "name": "Trazodone", "generic": "Trazodone", "typicalDosages": ["50 mg tablet"] },
+  { "rxCui": "10089", "name": "Valium", "generic": "Diazepam", "typicalDosages": ["5 mg tablet"] },
+  { "rxCui": "10090", "name": "Ventolin HFA", "generic": "Albuterol", "typicalDosages": ["90 mcg inhaler"] },
+  { "rxCui": "10091", "name": "Viagra", "generic": "Sildenafil", "typicalDosages": ["50 mg tablet"] },
+  { "rxCui": "10092", "name": "Warfarin", "generic": "Warfarin", "typicalDosages": ["5 mg tablet"] },
+  { "rxCui": "10093", "name": "Xarelto", "generic": "Rivaroxaban", "typicalDosages": ["20 mg tablet"] },
+  { "rxCui": "10094", "name": "Xanax", "generic": "Alprazolam", "typicalDosages": ["0.25 mg tablet"] },
+  { "rxCui": "10095", "name": "Zoloft", "generic": "Sertraline", "typicalDosages": ["50 mg tablet"] },
+  { "rxCui": "10096", "name": "Zyrtec", "generic": "Cetirizine", "typicalDosages": ["10 mg tablet"] }
+];
 
-// GET /api/autocomplete?q=amox
 export async function GET(req: Request) {
-  try {
-    const { searchParams } = new URL(req.url);
-    const qRaw = (searchParams.get("q") || "").trim();
+  const { searchParams } = new URL(req.url);
+  const q = (searchParams.get("q") || "").toLowerCase().trim();
 
-    // tiny guards
-    if (qRaw.length < 2) {
-      return NextResponse.json([], { headers: { "cache-control": "no-store" } });
-    }
-    const q = qRaw.slice(0, 50); // cap length to avoid pathological queries
+  if (!q) return NextResponse.json([]);
 
-    // NOTE: ensure your Prisma model is `Drug` (PascalCase) unless you named it differently.
-    const results = await prisma.drug.findMany({
-      where: { name: { startsWith: q, mode: "insensitive" } }, // faster than contains for autocomplete
-      orderBy: { name: "asc" },
-      take: 10,
-      select: {
-        rxCui: true,
-        name: true,
-        forms: true,
-        strengths: true,
-      },
-    });
+  const results = topDrugs.filter((drug) =>
+    drug.name.toLowerCase().includes(q) || drug.generic.toLowerCase().includes(q)
+  ).slice(0, 10);
 
-    return NextResponse.json(results, {
-      headers: { "cache-control": "no-store" },
-    });
-  } catch (err) {
-    console.error("autocomplete error:", err);
-    return NextResponse.json(
-      { error: "Autocomplete failed" },
-      { status: 500, headers: { "cache-control": "no-store" } }
-    );
-  }
+  return NextResponse.json(results);
 }

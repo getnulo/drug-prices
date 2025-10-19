@@ -1,21 +1,32 @@
-import { PriceQuote } from "./types";
+import type { Offer } from "./types";
 
-export async function costPlusMock(args: {
-  drug: string;
+export async function costplusMock(args: {
+  drugRxCui: string;
+  drugName: string;
+  form: string;
   strength: string;
   quantity: number;
   zip?: string;
-}): Promise<PriceQuote[]> {
-  const { drug, strength, quantity } = args;
+}): Promise<Offer[]> {
+  const { drugRxCui, drugName, form, strength, quantity } = args;
   return [
     {
       source: "costplus",
-      drug,
+      drugRxCui,
+      drugName,
+      form,
       strength,
       quantity,
-      priceCents: 1299,
-      url: "https://costplusdrugs.com/",
-      updatedAt: new Date().toISOString()
-    }
+      priceSubtotal: 5.00,
+      priceFees: 5.00,
+      shipping: 5.00,
+      totalPrice: 15.00,
+      pickupOrMail: "mail",
+      pharmacyName: null,
+      pharmacyAddr: null,
+      pharmacyLat: null,
+      pharmacyLng: null,
+      terms: "Membership optional",
+    },
   ];
 }

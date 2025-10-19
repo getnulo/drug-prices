@@ -1,3 +1,5 @@
+export const runtime = 'nodejs';
+
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { handleApiError } from "@/lib/api/errorHandler";
@@ -36,9 +38,10 @@ export async function POST(req: Request) {
     });
 
     if (!parsed.success) {
+      const errorList = parsed.error?.errors?.map(e => e.message) ?? ["Unknown validation error"];
       return NextResponse.json({
         error: "Invalid input",
-        details: parsed.error.errors.map(e => e.message)
+        details: errorList,
       }, { status: 400 });
     }
 

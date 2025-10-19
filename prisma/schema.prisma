@@ -8,6 +8,8 @@ datasource db {
   url       = env("DATABASE_URL")
   // Local migrate/seed uses DIRECT_URL (the direct 5432 URL)
   directUrl = env("DIRECT_URL")
+
+  
 }
 
 model Drug {

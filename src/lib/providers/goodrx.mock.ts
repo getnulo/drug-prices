@@ -1,21 +1,33 @@
-import { PriceQuote } from "./types";
+import type { Offer } from "./types";
 
-export async function goodRxMock(args: {
-  drug: string;
+export async function goodrxMock(args: {
+  drugRxCui: string;
+  drugName: string;
+  form: string;
   strength: string;
   quantity: number;
   zip?: string;
-}): Promise<PriceQuote[]> {
-  const { drug, strength, quantity } = args;
+}): Promise<Offer[]> {
+  const { drugRxCui, drugName, form, strength, quantity, zip } = args;
+  // Example with a mock pharmacy
   return [
     {
       source: "goodrx",
-      drug,
+      drugRxCui,
+      drugName,
+      form,
       strength,
       quantity,
-      priceCents: 1599,
-      url: "https://www.goodrx.com/",
-      updatedAt: new Date().toISOString()
-    }
+      priceSubtotal: 7.99,
+      priceFees: 0,
+      shipping: null,
+      totalPrice: 7.99,
+      pickupOrMail: "pickup",
+      pharmacyName: "CVS Pharmacy",
+      pharmacyAddr: "123 Main St",
+      pharmacyLat: zip ? 40.01 : null,  // Example coordinate; replace or add logic from your DB if needed
+      pharmacyLng: zip ? -73.99 : null,
+      terms: "Coupon at checkout",
+    },
   ];
 }
