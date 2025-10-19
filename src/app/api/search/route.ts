@@ -1,33 +1,53 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { handleApiError } from "@/lib/api/errorHandler";
+import { z } from "zod";
 
-function milesBetween(a:{lat:number,lng:number}, b:{lat:number,lng:number}) {
-  const toRad = (x:number)=>x*Math.PI/180;
+// Define your input shape and requirements
+const searchSchema = z.object({
+  rxCui: z.string().min(1, "Missing rxCui"),
+  strength: z.string().min(1, "Missing strength"),
+  quantity: z.number().positive("Quantity must be positive"),
+  zip: z.string().regex(/^\d{5}$/, "ZIP must be 5 digits"),
+});
+
+// Helper for miles between two coordinates
+function milesBetween(a: { lat: number, lng: number }, b: { lat: number, lng: number }) {
+  const toRad = (x: number) => x * Math.PI / 180;
   const R = 3958.8;
   const dLat = toRad(b.lat - a.lat);
   const dLng = toRad(b.lng - a.lng);
   const lat1 = toRad(a.lat);
   const lat2 = toRad(b.lat);
-  const h = Math.sin(dLat/2)**2 + Math.cos(lat1)*Math.cos(lat2)*Math.sin(dLng/2)**2;
-  return 2*R*Math.asin(Math.sqrt(h));
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLng / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(h));
 }
 
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const rxCui = String(body.rxCui || "").trim();
-    const strength = String(body.strength || "").trim();
-    const quantity = Number(body.quantity);
-    const zip = String(body.zip || "").trim();
 
-    if (!rxCui || !strength || !zip || !Number.isFinite(quantity) || quantity <= 0) {
-      return NextResponse.json({ error: "Missing or invalid fields" }, { status: 400 });
+    // Use Zod to parse and validate input
+    const parsed = searchSchema.safeParse({
+      rxCui: String(body.rxCui || "").trim(),
+      strength: String(body.strength || "").trim(),
+      quantity: Number(body.quantity),
+      zip: String(body.zip || "").trim(),
+    });
+
+    if (!parsed.success) {
+      return NextResponse.json({
+        error: "Invalid input",
+        details: parsed.error.errors.map(e => e.message)
+      }, { status: 400 });
     }
 
-    await prisma.searchQuery.create({ data: { rxCui, strength, quantity, zip } });
+    const { rxCui, strength, quantity, zip } = parsed.data;
 
+    await prisma.searchQuery.create({ data: { rxCui, strength, quantity, zip } });
     const z = await prisma.zip.findUnique({ where: { zip } });
 
+    // Simulated mock offers
     const mockOffers = [
       {
         source: "goodrx",
@@ -83,8 +103,8 @@ export async function POST(req: Request) {
     })();
 
     return NextResponse.json({ offers });
-  } catch (err) {
-    console.error(err);
-    return NextResponse.json({ error: "Search failed" }, { status: 500 });
+  } catch (error) {
+    const { status, message } = handleApiError(error);
+    return NextResponse.json({ error: message }, { status });
   }
 }
